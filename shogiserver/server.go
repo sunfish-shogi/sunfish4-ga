@@ -24,7 +24,7 @@ func (s *ShogiServer) Dir() string {
 }
 
 func (s *ShogiServer) Setup() error {
-	cmd := exec.Command("git", "clone", "--depth", "1", "--branch", "master", "sunfish-shogi@git.pf.osdn.jp:/gitroot/s/su/sunfish-shogi/shogi-server.git", "shogi-server")
+	cmd := exec.Command("git", "clone", "--depth", "1", "--branch", "master", "git://git.pf.osdn.jp/gitroot/s/su/sunfish-shogi/shogi-server.git", "shogi-server")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
