@@ -135,7 +135,7 @@ func (ga *GAManager) Next() error {
 		ind := ga.crossover(i1, i2)
 		log.Printf("crossover: %s x %s => %s", i1.id, i2.id, ind.id)
 
-		if rand.Intn(100) < 1 /* 1/100 */ {
+		if rand.Intn(20) < 1 /* 1/20 */ {
 			ga.mutate(ind)
 			log.Printf("mutate: %s", ind.id)
 		}
@@ -235,11 +235,14 @@ func (ga *GAManager) crossover(i1, i2 *individual) *individual {
 }
 
 func (ga *GAManager) mutate(ind *individual) {
-	i := rand.Intn(len(ind.values))
-	min := ga.Config.Params[i].MinimumValue
-	max := ga.Config.Params[i].MaximumValue
-	t := min + rand.Int31n(max-min+1)
-	ind.values[i] = (ind.values[i] + t) / 2
+	n := rand.Intn(2) + 1
+	for ; n > 0; n-- {
+		i := rand.Intn(len(ind.values))
+		min := ga.Config.Params[i].MinimumValue
+		max := ga.Config.Params[i].MaximumValue
+		t := min + rand.Int31n(max-min+1)
+		ind.values[i] = (ind.values[i] + t) / 2
+	}
 }
 
 func (ga *GAManager) nextID() string {

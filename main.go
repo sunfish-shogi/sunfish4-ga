@@ -116,7 +116,7 @@ func main() {
 	}
 	config := ga.Config{
 		Params:             params,
-		NumberOfIndividual: 7,
+		NumberOfIndividual: 33,
 	}
 
 	m := ga.NewGAManager(config)
