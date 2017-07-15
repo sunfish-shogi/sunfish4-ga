@@ -113,6 +113,36 @@ func main() {
 			MinimumValue:    50,
 			MaximumValue:    500,
 		},
+		{
+			Name:            "PROBCUT_REDUCTION",
+			FirstEliteValue: 4,
+			MinimumValue:    1,
+			MaximumValue:    10,
+		},
+		{
+			Name:            "ASP_SEARCH_WIDTH1",
+			FirstEliteValue: 128,
+			MinimumValue:    64,
+			MaximumValue:    512,
+		},
+		{
+			Name:            "ASP_SEARCH_WIDTH2",
+			FirstEliteValue: 512,
+			MinimumValue:    64,
+			MaximumValue:    1024,
+		},
+		{
+			Name:            "SINGULAR_DEPTH",
+			FirstEliteValue: 8,
+			MinimumValue:    4,
+			MaximumValue:    12,
+		},
+		{
+			Name:            "SINGULAR_MARGIN",
+			FirstEliteValue: 3,
+			MinimumValue:    1,
+			MaximumValue:    32,
+		},
 	}
 	config := ga.Config{
 		Params:             params,
