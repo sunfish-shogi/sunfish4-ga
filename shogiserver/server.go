@@ -2,6 +2,7 @@ package shogiserver
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -43,7 +44,11 @@ func (s *ShogiServer) Setup() error {
 
 func (s *ShogiServer) Stop() {
 	if s.Cmd != nil && s.Cmd.Process != nil {
-		s.Cmd.Process.Kill()
+		if err := s.Cmd.Process.Kill(); err != nil {
+			log.Println(err)
+		} else if _, err := s.Cmd.Process.Wait(); err != nil {
+			log.Println(err)
+		}
 	}
 }
 

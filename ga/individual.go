@@ -2,6 +2,7 @@ package ga
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -142,7 +143,11 @@ func (ind *individual) writeCsaIni() error {
 
 func (ind *individual) stop() {
 	if ind.cmd != nil && ind.cmd.Process != nil {
-		ind.cmd.Process.Kill()
+		if err := ind.cmd.Process.Kill(); err != nil {
+			log.Println(err)
+		} else if _, err := ind.cmd.Process.Wait(); err != nil {
+			log.Println(err)
+		}
 	}
 	os.RemoveAll(ind.Dir())
 }
