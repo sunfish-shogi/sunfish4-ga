@@ -118,11 +118,15 @@ func (ga *GAManager) Next() error {
 	inds := make([]*individual, 0, ga.Config.NumberOfIndividual)
 
 	// Elitism
-	for i := 0; i < 2; i++ {
-		ind := ga.copyElite(i)
-		log.Printf("elite: %s => %s", ga.inds[i].id, ind.id)
-		inds = append(inds, ind)
-	}
+	ind := ga.copyElite(0)
+	log.Printf("elite: %s => %s", ga.inds[0].id, ind.id)
+	inds = append(inds, ind)
+
+	// Random
+	ind = newIndividual(ga.nextID(), ga.Config)
+	ind.initParamByRandom()
+	log.Printf("random: => %s", ind.id)
+	inds = append(inds, ind)
 
 	for {
 		if len(inds) >= ga.Config.NumberOfIndividual {
@@ -203,7 +207,7 @@ func (ga *GAManager) selectIndividual(excludeID string) *individual {
 			if i == 0 {
 				weight[0] = 1024
 			} else {
-				weight[i] = weight[i-1]*4/5 + 1
+				weight[i] = weight[i-1]*9/10 + 1
 			}
 			sum += weight[i]
 		}
