@@ -1,16 +1,12 @@
 package ga
 
 import (
-	"fmt"
 	"log"
 	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 
 	server "github.com/sunfish-shogi/sunfish4-ga/shogiserver"
 )
@@ -68,11 +64,8 @@ func (ga *GAManager) Start() error {
 		ga.inds = append(ga.inds, ind)
 	}
 
-	errs := ga.startIndividuals()
-	if len(errs) != 0 {
-		return errs[0]
-	}
-	return nil
+	err = startIndividuals(append(ga.inds, ga.normal))
+	return err
 }
 
 type indsDescScoreOrder []*individual
@@ -157,41 +150,9 @@ func (ga *GAManager) Next() error {
 	// Replace to New Generation
 	ga.inds = inds
 
-	ga.startIndividuals()
+	startIndividuals(ga.inds)
 
 	return nil
-}
-
-func (ga *GAManager) startIndividuals() []error {
-	var errs []error
-
-	// Setup
-	var wg sync.WaitGroup
-	for _, ind := range ga.inds {
-		wg.Add(1)
-		go func(ind *individual) {
-			defer wg.Done()
-			err := ind.setup()
-			if err != nil {
-				err = errors.Wrap(err, fmt.Sprintf("failed to setup sunfish %s", ind.id))
-				errs = append(errs, err)
-				log.Println(err)
-			}
-		}(ind)
-	}
-	wg.Wait()
-
-	// Start
-	for _, ind := range ga.inds {
-		err := ind.start()
-		if err != nil {
-			err = errors.Wrap(err, fmt.Sprintf("failed to start sunfish %s", ind.id))
-			errs = append(errs, err)
-			log.Println(err)
-		}
-	}
-
-	return errs
 }
 
 func (ga *GAManager) copyElite(idx int) *individual {

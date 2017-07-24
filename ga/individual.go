@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sunfish-shogi/sunfish4-ga/util"
+	"golang.org/x/sync/errgroup"
 )
 
 type individual struct {
@@ -154,4 +155,36 @@ func (ind *individual) stop() {
 
 func (ind *individual) Dir() string {
 	return path.Join(util.WorkDir(), ind.id)
+}
+
+func startIndividuals(inds []*individual) error {
+	// Setup
+	var eg errgroup.Group
+	for _, _ind := range inds {
+		ind := _ind
+		eg.Go(func() error {
+			err := ind.setup()
+			if err != nil {
+				err = errors.Wrap(err, fmt.Sprintf("failed to setup sunfish %s", ind.id))
+				log.Println(err)
+				return err
+			}
+			return nil
+		})
+	}
+	rerr := eg.Wait()
+
+	// Start
+	for _, ind := range inds {
+		err := ind.start()
+		if err != nil {
+			err = errors.Wrap(err, fmt.Sprintf("failed to start sunfish %s", ind.id))
+			log.Println(err)
+			if rerr == nil {
+				rerr = err
+			}
+		}
+	}
+
+	return rerr
 }
