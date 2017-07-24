@@ -29,9 +29,9 @@ func newIndividual(id string, config Config) *individual {
 	return ind
 }
 
-func (ind *individual) initParamForFirstElite() {
+func (ind *individual) initParamNormal() {
 	for i := range ind.config.Params {
-		ind.values[i] = ind.config.Params[i].FirstEliteValue
+		ind.values[i] = ind.config.Params[i].Normal
 	}
 }
 

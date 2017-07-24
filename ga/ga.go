@@ -20,10 +20,12 @@ type GAManager struct {
 
 	server server.ShogiServer
 	lastID int
+	normal *individual
 	inds   []*individual
 }
 
 func NewGAManager(config Config) *GAManager {
+	validateConfig(config)
 	return &GAManager{
 		Config: config,
 	}
@@ -55,15 +57,14 @@ func (ga *GAManager) Start() error {
 		return err
 	}
 
+	ga.normal = newIndividual(ga.nextID(), ga.Config)
+	ga.normal.initParamNormal()
+
 	ga.inds = make([]*individual, 0, ga.Config.NumberOfIndividual)
 	ga.lastID = 0
 	for i := 0; i < ga.Config.NumberOfIndividual; i++ {
 		ind := newIndividual(ga.nextID(), ga.Config)
-		if i == 0 {
-			ind.initParamForFirstElite()
-		} else {
-			ind.initParamByRandom()
-		}
+		ind.initParamByRandom()
 		ga.inds = append(ga.inds, ind)
 	}
 
@@ -139,7 +140,7 @@ func (ga *GAManager) Next() error {
 		ind := ga.crossover(i1, i2)
 		log.Printf("crossover: %s x %s => %s", i1.id, i2.id, ind.id)
 
-		if rand.Intn(20) < 1 /* 1/20 */ {
+		if rand.Intn(10) < 1 /* 1/10 */ {
 			ga.mutate(ind)
 			log.Printf("mutate: %s", ind.id)
 		}
@@ -267,6 +268,7 @@ func (ga *GAManager) PrintGeneration(gn int) {
 }
 
 func (ga *GAManager) Destroy() {
+	ga.normal.stop()
 	for i := range ga.inds {
 		ga.inds[i].stop()
 	}
