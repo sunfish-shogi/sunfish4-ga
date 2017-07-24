@@ -57,7 +57,6 @@ func (ga *GAManager) Start() error {
 	ga.normal.initParamNormal()
 
 	ga.inds = make([]*individual, 0, ga.Config.NumberOfIndividual)
-	ga.lastID = 0
 	for i := 0; i < ga.Config.NumberOfIndividual; i++ {
 		ind := newIndividual(ga.nextID(), ga.Config)
 		ind.initParamByRandom()
