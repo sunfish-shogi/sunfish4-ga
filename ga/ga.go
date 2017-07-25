@@ -111,12 +111,11 @@ func (ga *GAManager) Next() error {
 	inds := make([]*individual, 0, ga.Config.NumberOfIndividual)
 
 	// Elitism
-	ind := ga.copyElite(0)
-	log.Printf("elite: %s => %s", ga.inds[0].id, ind.id)
-	inds = append(inds, ind)
+	log.Printf("elite: %s", ga.inds[0].id)
+	inds = append(inds, inds[0])
 
 	// Random
-	ind = newIndividual(ga.nextID(), ga.Config)
+	ind := newIndividual(ga.nextID(), ga.Config)
 	ind.initParamByRandom()
 	log.Printf("random: => %s", ind.id)
 	inds = append(inds, ind)
@@ -141,9 +140,16 @@ func (ga *GAManager) Next() error {
 	}
 	log.Println()
 
+	nextIDs := make(map[string]struct{}, 8)
+	for i := range inds {
+		nextIDs[inds[i].id] = struct{}{}
+	}
+
 	// Stop Previous Generation
 	for i := range ga.inds {
-		ga.inds[i].stop()
+		if _, s := nextIDs[ga.inds[i].id]; !s {
+			ga.inds[i].stop()
+		}
 	}
 
 	// Replace to New Generation
@@ -152,12 +158,6 @@ func (ga *GAManager) Next() error {
 	startIndividuals(ga.inds)
 
 	return nil
-}
-
-func (ga *GAManager) copyElite(idx int) *individual {
-	ind := newIndividual(ga.nextID(), ga.Config)
-	ind.initParam(ga.inds[idx].values)
-	return ind
 }
 
 func (ga *GAManager) selectIndividual(excludeID string) *individual {

@@ -162,6 +162,10 @@ func startIndividuals(inds []*individual) error {
 	var eg errgroup.Group
 	for _, _ind := range inds {
 		ind := _ind
+		if ind.cmd != nil {
+			continue
+		}
+
 		eg.Go(func() error {
 			err := ind.setup()
 			if err != nil {
@@ -176,6 +180,10 @@ func startIndividuals(inds []*individual) error {
 
 	// Start
 	for _, ind := range inds {
+		if ind.cmd != nil {
+			continue
+		}
+
 		err := ind.start()
 		if err != nil {
 			err = errors.Wrap(err, fmt.Sprintf("failed to start sunfish %s", ind.id))
