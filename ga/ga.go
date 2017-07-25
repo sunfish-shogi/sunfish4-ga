@@ -112,7 +112,7 @@ func (ga *GAManager) Next() error {
 
 	// Elitism
 	log.Printf("elite: %s", ga.inds[0].id)
-	inds = append(inds, inds[0])
+	inds = append(inds, ga.inds[0])
 
 	// Random
 	ind := newIndividual(ga.nextID(), ga.Config)
