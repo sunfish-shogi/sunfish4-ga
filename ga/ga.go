@@ -14,10 +14,12 @@ import (
 type GAManager struct {
 	Config Config
 
-	server server.ShogiServer
-	lastID int
-	normal *individual
-	inds   []*individual
+	server   server.ShogiServer
+	lastID   int
+	indMap   map[string]*individual
+	normal   *individual
+	allInds  []*individual
+	currInds []*individual
 }
 
 func NewGAManager(config Config) *GAManager {
@@ -56,14 +58,15 @@ func (ga *GAManager) Start() error {
 	ga.normal = newIndividual(ga.nextID(), ga.Config)
 	ga.normal.initParamNormal()
 
-	ga.inds = make([]*individual, 0, ga.Config.NumberOfIndividual)
+	ga.currInds = make([]*individual, 0, ga.Config.NumberOfIndividual)
 	for i := 0; i < ga.Config.NumberOfIndividual; i++ {
 		ind := newIndividual(ga.nextID(), ga.Config)
 		ind.initParamByRandom()
-		ga.inds = append(ga.inds, ind)
+		ga.currInds = append(ga.currInds, ind)
 	}
+	ga.updateIndMap()
 
-	err = startIndividuals(append(ga.inds, ga.normal))
+	err = startIndividuals(append(ga.currInds, ga.normal))
 	return err
 }
 
@@ -81,29 +84,20 @@ func (ga *GAManager) Next() error {
 
 	for pi := range rate.Players {
 		for _, player := range rate.Players[pi] {
-			if player.Win+player.Loss < 100 {
-				continue
-			}
-			for i := range ga.inds {
-				if ga.inds[i].id == player.Name {
-					ga.inds[i].score = player.Rate
-					break
-				}
+			if ind, ok := ga.indMap[player.Name]; ok {
+				ind.score = player.Rate
 			}
 		}
 	}
 
 	// Sort by Score
-	if ga.inds[0].score != 0 {
-		sort.Stable(indsDescScoreOrder(ga.inds))
-	} else {
-		sort.Stable(indsDescScoreOrder(ga.inds[1:]))
-	}
+	sort.Stable(indsDescScoreOrder(ga.allInds))
+	sort.Stable(indsDescScoreOrder(ga.currInds))
 
 	// Print Scores
 	log.Println("Score")
-	for i := range ga.inds {
-		log.Printf("%s %0.3f", ga.inds[i].id, ga.inds[i].score)
+	for i := range ga.currInds {
+		log.Printf("%s %0.3f", ga.currInds[i].id, ga.currInds[i].score)
 	}
 	log.Println()
 
@@ -111,8 +105,8 @@ func (ga *GAManager) Next() error {
 	inds := make([]*individual, 0, ga.Config.NumberOfIndividual)
 
 	// Elitism
-	log.Printf("elite: %s", ga.inds[0].id)
-	inds = append(inds, ga.inds[0])
+	log.Printf("elite: %s", ga.allInds[0].id)
+	inds = append(inds, ga.allInds[0])
 
 	// Random
 	ind := newIndividual(ga.nextID(), ga.Config)
@@ -140,31 +134,24 @@ func (ga *GAManager) Next() error {
 	}
 	log.Println()
 
-	nextIDs := make(map[string]struct{}, 8)
-	for i := range inds {
-		nextIDs[inds[i].id] = struct{}{}
-	}
-
 	// Stop Previous Generation
-	for i := range ga.inds {
-		if _, s := nextIDs[ga.inds[i].id]; !s {
-			ga.inds[i].stop()
-		}
-	}
+	stopIndividuals(ga.currInds)
 
 	// Replace to New Generation
-	ga.inds = inds
+	ga.currInds = inds
+	ga.updateIndMap()
 
-	startIndividuals(ga.inds)
+	// Start Next Generation
+	startIndividuals(ga.currInds)
 
 	return nil
 }
 
 func (ga *GAManager) selectIndividual(excludeID string) *individual {
-	weight := make([]int, len(ga.inds))
+	weight := make([]int, len(ga.currInds))
 	var sum int
 	for i := range weight {
-		if ga.inds[i].id != excludeID {
+		if ga.currInds[i].id != excludeID {
 			if i == 0 {
 				weight[0] = 1024
 			} else {
@@ -179,10 +166,10 @@ func (ga *GAManager) selectIndividual(excludeID string) *individual {
 	for i := range weight {
 		r -= weight[i]
 		if r <= 0 {
-			return ga.inds[i]
+			return ga.currInds[i]
 		}
 	}
-	return ga.inds[0]
+	return ga.currInds[0]
 }
 
 func (ga *GAManager) crossover(i1, i2 *individual) *individual {
@@ -217,20 +204,31 @@ func (ga *GAManager) nextID() string {
 
 func (ga *GAManager) PrintGeneration(gn int) {
 	log.Printf("Generation: %d\n", gn)
-	for i := range ga.inds {
-		ss := make([]string, len(ga.inds[i].values))
-		for vi, v := range ga.inds[i].values {
+	for i := range ga.currInds {
+		ss := make([]string, len(ga.currInds[i].values))
+		for vi, v := range ga.currInds[i].values {
 			ss[vi] = strconv.Itoa(int(v))
 		}
-		log.Printf("%s [%s]\n", ga.inds[i].id, strings.Join(ss, ","))
+		log.Printf("%s [%s]\n", ga.currInds[i].id, strings.Join(ss, ","))
 	}
 	log.Println()
 }
 
 func (ga *GAManager) Destroy() {
-	ga.normal.stop()
-	for i := range ga.inds {
-		ga.inds[i].stop()
+	ga.normal.stopWithClean()
+	for i := range ga.currInds {
+		ga.currInds[i].stopWithClean()
 	}
 	ga.server.Stop()
+}
+
+func (ga *GAManager) updateIndMap() {
+	for i := range ga.currInds {
+		ga.indMap[ga.currInds[i].id] = ga.currInds[i]
+	}
+
+	ga.allInds = make([]*individual, len(ga.indMap))
+	for _, ind := range ga.indMap {
+		ga.allInds = append(ga.allInds, ind)
+	}
 }

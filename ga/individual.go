@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/sunfish-shogi/sunfish4-ga/util"
@@ -142,14 +143,23 @@ func (ind *individual) writeCsaIni() error {
 	return f.Close()
 }
 
-func (ind *individual) stop() {
+func (ind *individual) stopWithClean() {
+	ind.kill()
+	ind.clean()
+}
+
+func (ind *individual) kill() {
 	if ind.cmd != nil && ind.cmd.Process != nil {
 		if err := ind.cmd.Process.Kill(); err != nil {
 			log.Println(err)
 		} else if _, err := ind.cmd.Process.Wait(); err != nil {
 			log.Println(err)
 		}
+		ind.cmd = nil
 	}
+}
+
+func (ind *individual) clean() {
 	os.RemoveAll(ind.Dir())
 }
 
@@ -195,4 +205,27 @@ func startIndividuals(inds []*individual) error {
 	}
 
 	return rerr
+}
+
+func stopIndividuals(inds []*individual) {
+	// Kill
+	wg := &sync.WaitGroup{}
+	for _, _ind := range inds {
+		ind := _ind
+		if ind.cmd != nil {
+			continue
+		}
+
+		wg.Add(1)
+		func() {
+			defer wg.Done()
+			ind.kill()
+		}()
+	}
+	wg.Wait()
+
+	// Clean
+	for _, ind := range inds {
+		ind.clean()
+	}
 }
