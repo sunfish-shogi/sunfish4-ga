@@ -26,6 +26,7 @@ func NewGAManager(config Config) *GAManager {
 	validateConfig(config)
 	return &GAManager{
 		Config: config,
+		indMap: make(map[string]*individual),
 	}
 }
 
