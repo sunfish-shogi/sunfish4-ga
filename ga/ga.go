@@ -228,7 +228,7 @@ func (ga *GAManager) updateIndMap() {
 		ga.indMap[ga.currInds[i].id] = ga.currInds[i]
 	}
 
-	ga.allInds = make([]*individual, len(ga.indMap))
+	ga.allInds = make([]*individual, 0, len(ga.indMap))
 	for _, ind := range ga.indMap {
 		ga.allInds = append(ga.allInds, ind)
 	}
