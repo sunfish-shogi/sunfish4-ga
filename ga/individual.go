@@ -86,6 +86,10 @@ func (ind *individual) setup() error {
 }
 
 func (ind *individual) start() error {
+	if ind.cmd != nil {
+		return fmt.Errorf("sunfish_csa already started")
+	}
+
 	ind.cmd = util.Command(path.Join(ind.Dir(), "sunfish_csa"), "-s")
 	ind.cmd.Dir = path.Join(ind.Dir())
 	err := ind.cmd.Start()
@@ -172,10 +176,6 @@ func startIndividuals(inds []*individual) error {
 	var eg errgroup.Group
 	for _, _ind := range inds {
 		ind := _ind
-		if ind.cmd != nil {
-			continue
-		}
-
 		eg.Go(func() error {
 			err := ind.setup()
 			if err != nil {
@@ -190,10 +190,6 @@ func startIndividuals(inds []*individual) error {
 
 	// Start
 	for _, ind := range inds {
-		if ind.cmd != nil {
-			continue
-		}
-
 		err := ind.start()
 		if err != nil {
 			err = errors.Wrap(err, fmt.Sprintf("failed to start sunfish %s", ind.id))
@@ -210,17 +206,12 @@ func startIndividuals(inds []*individual) error {
 func stopIndividuals(inds []*individual) {
 	// Kill
 	wg := &sync.WaitGroup{}
-	for _, _ind := range inds {
-		ind := _ind
-		if ind.cmd != nil {
-			continue
-		}
-
+	for _, ind := range inds {
 		wg.Add(1)
-		func() {
+		func(ind *individual) {
 			defer wg.Done()
 			ind.kill()
-		}()
+		}(ind)
 	}
 	wg.Wait()
 
