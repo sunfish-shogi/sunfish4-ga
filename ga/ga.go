@@ -83,12 +83,21 @@ func (ga *GAManager) Next() error {
 		return err
 	}
 
+	ga.normal.score = 0
+	for _, ind := range ga.indMap {
+		ind.score = 0
+	}
 	for pi := range rate.Players {
 		for _, player := range rate.Players[pi] {
 			if ind, ok := ga.indMap[player.Name]; ok {
 				ind.score = player.Rate
+			} else if ga.normal.id == player.Name {
+				ga.normal.score = player.Rate
 			}
 		}
+	}
+	for _, ind := range ga.indMap {
+		ind.score -= ga.normal.score
 	}
 
 	// Sort by Score
@@ -110,10 +119,12 @@ func (ga *GAManager) Next() error {
 	inds = append(inds, ga.allInds[0])
 
 	// Random
-	ind := newIndividual(ga.nextID(), ga.Config)
-	ind.initParamByRandom()
-	log.Printf("random: => %s", ind.id)
-	inds = append(inds, ind)
+	for i := 0; i < 8; i++ {
+		ind := newIndividual(ga.nextID(), ga.Config)
+		ind.initParamByRandom()
+		log.Printf("random: => %s", ind.id)
+		inds = append(inds, ind)
+	}
 
 	for {
 		if len(inds) >= ga.Config.NumberOfIndividual {
@@ -126,7 +137,7 @@ func (ga *GAManager) Next() error {
 		ind := ga.crossover(i1, i2)
 		log.Printf("crossover: %s x %s => %s", i1.id, i2.id, ind.id)
 
-		if rand.Intn(10) < 1 /* 1/10 */ {
+		if rand.Intn(8) < 1 /* 1/8 */ {
 			ga.mutate(ind)
 			log.Printf("mutate: %s", ind.id)
 		}
@@ -194,7 +205,7 @@ func (ga *GAManager) mutate(ind *individual) {
 		min := ga.Config.Params[i].MinimumValue
 		max := ga.Config.Params[i].MaximumValue
 		t := min + rand.Int31n(max-min+1)
-		ind.values[i] = (ind.values[i] + t) / 2
+		ind.values[i] = t
 	}
 }
 
