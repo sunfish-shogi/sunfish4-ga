@@ -15,7 +15,6 @@ type GAManager struct {
 	Config Config
 
 	server   server.ShogiServer
-	lastID   int
 	indMap   map[string]*individual
 	normal   *individual
 	allInds  []*individual
@@ -25,8 +24,9 @@ type GAManager struct {
 func NewGAManager(config Config) *GAManager {
 	validateConfig(config)
 	return &GAManager{
-		Config: config,
-		indMap: make(map[string]*individual),
+		Config:  config,
+		indMap:  make(map[string]*individual),
+		allInds: make([]*individual, 0, 1024),
 	}
 }
 
@@ -41,7 +41,7 @@ func (ga *GAManager) Run() error {
 	for gn := 1; ; gn++ {
 		ga.PrintGeneration(gn)
 
-		time.Sleep(time.Hour * 4)
+		time.Sleep(ga.Config.Duration)
 
 		err = ga.Next()
 		if err != nil {
@@ -56,16 +56,19 @@ func (ga *GAManager) Start() error {
 		return err
 	}
 
-	ga.normal = newIndividual(ga.nextID(), ga.Config)
-	ga.normal.initParamNormal()
+	var ok bool
+	ga.normal, ok = ga.newIndividual(generateNormalValues(ga.Config), "normal")
+	if !ok {
+		log.Fatal("fatal error: failed to generate normal player")
+	}
 
 	ga.currInds = make([]*individual, 0, ga.Config.NumberOfIndividual)
-	for i := 0; i < ga.Config.NumberOfIndividual; i++ {
-		ind := newIndividual(ga.nextID(), ga.Config)
-		ind.initParamByRandom()
-		ga.currInds = append(ga.currInds, ind)
+	for len(ga.currInds) < ga.Config.NumberOfIndividual {
+		ind, ok := ga.newIndividual(generateRandomValues(ga.Config), "")
+		if ok {
+			ga.currInds = append(ga.currInds, ind)
+		}
 	}
-	ga.updateIndMap()
 
 	err = startIndividuals(append(ga.currInds, ga.normal))
 	return err
@@ -83,7 +86,6 @@ func (ga *GAManager) Next() error {
 		return err
 	}
 
-	ga.normal.score = 0
 	for _, ind := range ga.indMap {
 		ind.score = 0
 	}
@@ -91,13 +93,13 @@ func (ga *GAManager) Next() error {
 		for _, player := range rate.Players[pi] {
 			if ind, ok := ga.indMap[player.Name]; ok {
 				ind.score = player.Rate
-			} else if ga.normal.id == player.Name {
-				ga.normal.score = player.Rate
 			}
 		}
 	}
 	for _, ind := range ga.indMap {
-		ind.score -= ga.normal.score
+		if ind.id != ga.normal.id {
+			ind.score -= ga.normal.score
+		}
 	}
 
 	// Sort by Score
@@ -119,11 +121,14 @@ func (ga *GAManager) Next() error {
 	inds = append(inds, ga.allInds[0])
 
 	// Random
-	for i := 0; i < 8; i++ {
-		ind := newIndividual(ga.nextID(), ga.Config)
-		ind.initParamByRandom()
-		log.Printf("random: => %s", ind.id)
-		inds = append(inds, ind)
+	numberOfRandomPlayers := ga.Config.NumberOfIndividual / 4
+	for i := 0; i < numberOfRandomPlayers; {
+		ind, ok := ga.newIndividual(generateRandomValues(ga.Config), "")
+		if ok {
+			log.Printf("random: => %s", ind.id)
+			inds = append(inds, ind)
+			i++
+		}
 	}
 
 	for {
@@ -134,15 +139,24 @@ func (ga *GAManager) Next() error {
 		i1 := ga.selectIndividual("")
 		i2 := ga.selectIndividual(i1.id)
 
-		ind := ga.crossover(i1, i2)
-		log.Printf("crossover: %s x %s => %s", i1.id, i2.id, ind.id)
+		ind, ok := ga.crossover(i1, i2)
+		if ok {
+			log.Printf("crossover: %s x %s => %s", i1.id, i2.id, ind.id)
 
-		if rand.Intn(8) < 1 /* 1/8 */ {
-			ga.mutate(ind)
-			log.Printf("mutate: %s", ind.id)
+			if rand.Intn(8) < 1 /* 1/8 */ {
+				ga.mutate(ind)
+				log.Printf("mutate: %s", ind.id)
+			}
+
+			inds = append(inds, ind)
+			continue
 		}
 
-		inds = append(inds, ind)
+		ind, ok = ga.newIndividual(generateRandomValues(ga.Config), "")
+		if ok {
+			log.Printf("random: => %s", ind.id)
+			inds = append(inds, ind)
+		}
 	}
 	log.Println()
 
@@ -151,7 +165,6 @@ func (ga *GAManager) Next() error {
 
 	// Replace to New Generation
 	ga.currInds = inds
-	ga.updateIndMap()
 
 	// Start Next Generation
 	startIndividuals(ga.currInds)
@@ -184,8 +197,7 @@ func (ga *GAManager) selectIndividual(excludeID string) *individual {
 	return ga.currInds[0]
 }
 
-func (ga *GAManager) crossover(i1, i2 *individual) *individual {
-	ind := newIndividual(ga.nextID(), ga.Config)
+func (ga *GAManager) crossover(i1, i2 *individual) (*individual, bool) {
 	values := make([]int32, len(ga.Config.Params))
 	for i := range values {
 		if rand.Intn(2) == 0 {
@@ -194,8 +206,7 @@ func (ga *GAManager) crossover(i1, i2 *individual) *individual {
 			values[i] = i2.values[i]
 		}
 	}
-	ind.initParam(values)
-	return ind
+	return ga.newIndividual(values, "")
 }
 
 func (ga *GAManager) mutate(ind *individual) {
@@ -207,11 +218,6 @@ func (ga *GAManager) mutate(ind *individual) {
 		t := min + rand.Int31n(max-min+1)
 		ind.values[i] = t
 	}
-}
-
-func (ga *GAManager) nextID() string {
-	ga.lastID++
-	return strconv.Itoa(ga.lastID)
 }
 
 func (ga *GAManager) PrintGeneration(gn int) {
@@ -234,13 +240,16 @@ func (ga *GAManager) Destroy() {
 	ga.server.Stop()
 }
 
-func (ga *GAManager) updateIndMap() {
-	for i := range ga.currInds {
-		ga.indMap[ga.currInds[i].id] = ga.currInds[i]
+func (ga *GAManager) newIndividual(values []int32, customID string) (*individual, bool) {
+	ind := newIndividual(ga.Config, values, customID)
+
+	if _, exists := ga.indMap[ind.id]; exists {
+		return nil, false
 	}
 
-	ga.allInds = make([]*individual, 0, len(ga.indMap))
-	for _, ind := range ga.indMap {
+	ga.indMap[ind.id] = ind
+	if customID == "" {
 		ga.allInds = append(ga.allInds, ind)
 	}
+	return ind, true
 }

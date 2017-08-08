@@ -3,7 +3,7 @@ package ga
 import (
 	"fmt"
 	"log"
-	"math/rand"
+	"math/big"
 	"os"
 	"os/exec"
 	"path"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sunfish-shogi/sunfish4-ga/util"
+	"github.com/tv42/base58"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -22,31 +23,29 @@ type individual struct {
 	config Config
 }
 
-func newIndividual(id string, config Config) *individual {
+func newIndividual(config Config, values []int32, customID string) *individual {
 	ind := &individual{
-		id:     id,
-		values: make([]int32, len(config.Params)),
+		values: values,
 		config: config,
+	}
+	if customID != "" {
+		ind.id = customID
+	} else {
+		ind.setUniqueID()
 	}
 	return ind
 }
 
-func (ind *individual) initParamNormal() {
+func (ind *individual) setUniqueID() {
+	x := big.NewInt(0)
 	for i := range ind.config.Params {
-		ind.values[i] = ind.config.Params[i].Normal
-	}
-}
+		value := ind.values[i]
+		param := ind.config.Params[i]
 
-func (ind *individual) initParamByRandom() {
-	for i := range ind.config.Params {
-		min := ind.config.Params[i].MinimumValue
-		max := ind.config.Params[i].MaximumValue
-		ind.values[i] = min + rand.Int31n(max-min+1)
+		x.Mul(x, big.NewInt(int64(param.MaximumValue-param.MinimumValue)))
+		x.Add(x, big.NewInt(int64(value-param.MinimumValue)))
 	}
-}
-
-func (ind *individual) initParam(values []int32) {
-	copy(ind.values, values)
+	ind.id = string(base58.EncodeBig(nil, x))
 }
 
 func (ind *individual) setup() error {

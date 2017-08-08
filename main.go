@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/sunfish-shogi/sunfish4-ga/ga"
 )
@@ -147,6 +148,7 @@ func main() {
 	config := ga.Config{
 		Params:             params,
 		NumberOfIndividual: 32,
+		Duration:           time.Hour * 4,
 	}
 
 	m := ga.NewGAManager(config)
