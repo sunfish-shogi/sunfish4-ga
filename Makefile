@@ -20,6 +20,10 @@ build: $(BIN)
 vet:
 	go vet $(PKG)/...
 
+.PHONY: test
+test:
+	go test $(PKG)/...
+
 $(INST_PATH): $(BIN)
 	cp $(BIN) $(INST_PATH)
 
