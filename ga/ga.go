@@ -2,6 +2,7 @@ package ga
 
 import (
 	"log"
+	"math"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -74,6 +75,14 @@ func (ga *GAManager) Start() error {
 	return err
 }
 
+type indsDescLowerScoreOrder []*individual
+
+func (inds indsDescLowerScoreOrder) Len() int      { return len(inds) }
+func (inds indsDescLowerScoreOrder) Swap(i, j int) { inds[i], inds[j] = inds[j], inds[i] }
+func (inds indsDescLowerScoreOrder) Less(i, j int) bool {
+	return inds[i].scoreLower > inds[j].scoreLower
+}
+
 type indsDescScoreOrder []*individual
 
 func (inds indsDescScoreOrder) Len() int           { return len(inds) }
@@ -93,6 +102,9 @@ func (ga *GAManager) Next() error {
 		for _, player := range rate.Players[pi] {
 			if ind, ok := ga.indMap[player.Name]; ok {
 				ind.score = player.Rate
+				ci := confidenceInterval95(player.Win, player.Loss)
+				ind.scoreLower = player.Rate - ci
+				ind.scoreUpper = player.Rate + ci
 			}
 		}
 	}
@@ -103,13 +115,13 @@ func (ga *GAManager) Next() error {
 	}
 
 	// Sort by Score
-	sort.Stable(indsDescScoreOrder(ga.allInds))
+	sort.Stable(indsDescLowerScoreOrder(ga.allInds))
 	sort.Stable(indsDescScoreOrder(ga.currInds))
 
 	// Print Scores
 	log.Println("Score")
 	for i := range ga.currInds {
-		log.Printf("%s %0.3f", ga.currInds[i].id, ga.currInds[i].score)
+		log.Printf("%s %0.3f [%0.3f, %0.3f]", ga.currInds[i].id, ga.currInds[i].score, ga.currInds[i].scoreLower, ga.currInds[i].scoreUpper)
 	}
 	log.Println()
 
@@ -119,6 +131,13 @@ func (ga *GAManager) Next() error {
 	// Elitism
 	log.Printf("elite: %s", ga.allInds[0].id)
 	inds = append(inds, ga.allInds[0])
+
+	i := 0
+	if ga.currInds[i].id == ga.allInds[0].id {
+		i++
+	}
+	log.Printf("elite: %s", ga.currInds[i].id)
+	inds = append(inds, ga.currInds[i])
 
 	// Random
 	numberOfRandomPlayers := ga.Config.NumberOfIndividual / 4
@@ -252,4 +271,24 @@ func (ga *GAManager) newIndividual(values []int32, customID string) (*individual
 		ga.allInds = append(ga.allInds, ind)
 	}
 	return ind, true
+}
+
+func confidenceInterval95(win, loss float64) float64 {
+	if win == 0 || loss == 0 {
+		return 0
+	}
+
+	n := win + loss
+	q := win / n
+
+	if n <= 1 {
+		return 0
+	}
+
+	// standard deviation
+	a := n / (n - 1)
+	sd := 173.7 * a / math.Sqrt(n*q*(1-q))
+
+	// 95% confidence interval
+	return sd * 2
 }

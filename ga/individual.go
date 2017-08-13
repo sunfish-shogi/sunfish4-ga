@@ -16,11 +16,13 @@ import (
 )
 
 type individual struct {
-	id     string
-	values []int32
-	score  float64
-	cmd    *exec.Cmd
-	config Config
+	id         string
+	values     []int32
+	score      float64
+	scoreLower float64
+	scoreUpper float64
+	cmd        *exec.Cmd
+	config     Config
 }
 
 func newIndividual(config Config, values []int32, customID string) *individual {
