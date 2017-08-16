@@ -111,6 +111,8 @@ func (ga *GAManager) Next() error {
 	for _, ind := range ga.indMap {
 		if ind.id != ga.normal.id {
 			ind.score -= ga.normal.score
+			ind.scoreLower -= ga.normal.score
+			ind.scoreUpper -= ga.normal.score
 		}
 	}
 
