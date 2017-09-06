@@ -51,7 +51,7 @@ func (ind *individual) setUniqueID() {
 }
 
 func (ind *individual) setup() error {
-	err := util.Command("git", "clone", "--depth", "1", "--branch", "expt-ga", "https://github.com/sunfish-shogi/sunfish4.git", ind.id).Run()
+	err := util.Command("git", "clone", "--depth", "1", "--branch", "master", "https://github.com/sunfish-shogi/sunfish4.git", ind.id).Run()
 	if err != nil {
 		return errors.Wrap(err, "failed to clone sunfish4")
 	}
