@@ -24,8 +24,8 @@ func validateConfig(config Config) {
 		log.Fatal("NumberOfIndividual must not be zero")
 	}
 
-	if config.NumberOfIndividual%2 != 0 {
-		log.Fatal("NumberOfIndividual must be even number")
+	if config.NumberOfIndividual%2 == 0 {
+		log.Fatal("NumberOfIndividual must not be even number")
 	}
 }
 

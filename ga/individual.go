@@ -3,10 +3,13 @@ package ga
 import (
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -15,14 +18,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const nilValue int32 = math.MaxInt32
+
 type individual struct {
-	id         string
-	values     []int32
-	score      float64
-	scoreLower float64
-	scoreUpper float64
-	cmd        *exec.Cmd
-	config     Config
+	id     string
+	values []int32
+	score  float64
+	win    float64
+	loss   float64
+	cmd    *exec.Cmd
+	config Config
 }
 
 func newIndividual(config Config, values []int32, customID string) *individual {
@@ -220,4 +225,16 @@ func stopIndividuals(inds []*individual) {
 	for _, ind := range inds {
 		ind.clean()
 	}
+}
+
+func stringifyValues(values []int32) string {
+	ss := make([]string, len(values))
+	for vi, v := range values {
+		if v == nilValue {
+			ss[vi] = "*"
+		} else {
+			ss[vi] = strconv.Itoa(int(v))
+		}
+	}
+	return "[" + strings.Join(ss, ",") + "]"
 }

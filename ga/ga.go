@@ -4,9 +4,6 @@ import (
 	"log"
 	"math"
 	"math/rand"
-	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	server "github.com/sunfish-shogi/sunfish4-ga/shogiserver"
@@ -17,7 +14,6 @@ type GAManager struct {
 
 	server   server.ShogiServer
 	indMap   map[string]*individual
-	normal   *individual
 	allInds  []*individual
 	currInds []*individual
 }
@@ -57,12 +53,6 @@ func (ga *GAManager) Start() error {
 		return err
 	}
 
-	var ok bool
-	ga.normal, ok = ga.newIndividual(generateNormalValues(ga.Config), "normal")
-	if !ok {
-		log.Fatal("fatal error: failed to generate normal player")
-	}
-
 	ga.currInds = make([]*individual, 0, ga.Config.NumberOfIndividual)
 	for len(ga.currInds) < ga.Config.NumberOfIndividual {
 		ind, ok := ga.newIndividual(generateRandomValues(ga.Config), "")
@@ -71,23 +61,9 @@ func (ga *GAManager) Start() error {
 		}
 	}
 
-	err = startIndividuals(append(ga.currInds, ga.normal))
+	err = startIndividuals(ga.currInds)
 	return err
 }
-
-type indsDescLowerScoreOrder []*individual
-
-func (inds indsDescLowerScoreOrder) Len() int      { return len(inds) }
-func (inds indsDescLowerScoreOrder) Swap(i, j int) { inds[i], inds[j] = inds[j], inds[i] }
-func (inds indsDescLowerScoreOrder) Less(i, j int) bool {
-	return inds[i].scoreLower > inds[j].scoreLower
-}
-
-type indsDescScoreOrder []*individual
-
-func (inds indsDescScoreOrder) Len() int           { return len(inds) }
-func (inds indsDescScoreOrder) Swap(i, j int)      { inds[i], inds[j] = inds[j], inds[i] }
-func (inds indsDescScoreOrder) Less(i, j int) bool { return inds[i].score > inds[j].score }
 
 func (ga *GAManager) Next() error {
 	rate, err := ga.server.MakeRate()
@@ -102,84 +78,47 @@ func (ga *GAManager) Next() error {
 		for _, player := range rate.Players[pi] {
 			if ind, ok := ga.indMap[player.Name]; ok {
 				ind.score = player.Rate
-				ci := confidenceInterval95(player.Win, player.Loss)
-				ind.scoreLower = player.Rate - ci
-				ind.scoreUpper = player.Rate + ci
+				ind.win = player.Win
+				ind.loss = player.Loss
 			}
 		}
 	}
-	for _, ind := range ga.indMap {
-		if ind.id != ga.normal.id {
-			ind.score -= ga.normal.score
-			ind.scoreLower -= ga.normal.score
-			ind.scoreUpper -= ga.normal.score
-		}
-	}
-
-	// Sort by Score
-	sort.Stable(indsDescLowerScoreOrder(ga.allInds))
-	sort.Stable(indsDescScoreOrder(ga.currInds))
 
 	// Print Scores
 	log.Println("Score")
 	for i := range ga.currInds {
-		log.Printf("%s %0.3f [%0.3f, %0.3f]", ga.currInds[i].id, ga.currInds[i].score, ga.currInds[i].scoreLower, ga.currInds[i].scoreUpper)
+		log.Printf("%s %0.3f", ga.currInds[i].id, ga.currInds[i].score)
 	}
+	log.Println()
+
+	// Best Values
+	bestValues := ga.CalculateBestValues()
+	log.Println("Best Values")
+	log.Println(stringifyValues(bestValues))
 	log.Println()
 
 	// New Generation
 	inds := make([]*individual, 0, ga.Config.NumberOfIndividual)
 
-	// Elitism
-	log.Printf("elite: %s", ga.allInds[0].id)
-	inds = append(inds, ga.allInds[0])
-
-	i := 0
-	if ga.currInds[i].id == ga.allInds[0].id {
-		i++
-	}
-	log.Printf("elite: %s", ga.currInds[i].id)
-	inds = append(inds, ga.currInds[i])
-
-	// Random
-	numberOfRandomPlayers := ga.Config.NumberOfIndividual / 4
-	for i := 0; i < numberOfRandomPlayers; {
-		ind, ok := ga.newIndividual(generateRandomValues(ga.Config), "")
+	// Indivisuals
+	for i := 0; i < ga.Config.NumberOfIndividual; {
+		values := make([]int32, len(ga.Config.Params))
+		randomValues := generateRandomValues(ga.Config)
+		randomIdx := rand.Intn(len(ga.Config.Params))
+		for i := range ga.Config.Params {
+			if bestValues[i] == nilValue || i == randomIdx {
+				values[i] = randomValues[i]
+			} else {
+				values[i] = bestValues[i]
+			}
+		}
+		ind, ok := ga.newIndividual(values, "")
 		if ok {
 			log.Printf("random: => %s", ind.id)
 			inds = append(inds, ind)
 			i++
 		}
 	}
-
-	for {
-		if len(inds) >= ga.Config.NumberOfIndividual {
-			break
-		}
-
-		i1 := ga.selectIndividual("")
-		i2 := ga.selectIndividual(i1.id)
-
-		ind, ok := ga.crossover(i1, i2)
-		if ok {
-			log.Printf("crossover: %s x %s => %s", i1.id, i2.id, ind.id)
-
-			if rand.Intn(8) < 1 /* 1/8 */ {
-				ga.mutate(ind)
-				log.Printf("mutate: %s", ind.id)
-			}
-
-			inds = append(inds, ind)
-			continue
-		}
-
-		ind, ok = ga.newIndividual(generateRandomValues(ga.Config), "")
-		if ok {
-			log.Printf("random: => %s", ind.id)
-			inds = append(inds, ind)
-		}
-	}
-	log.Println()
 
 	// Stop Previous Generation
 	stopIndividuals(ga.currInds)
@@ -193,68 +132,15 @@ func (ga *GAManager) Next() error {
 	return nil
 }
 
-func (ga *GAManager) selectIndividual(excludeID string) *individual {
-	weight := make([]int, len(ga.currInds))
-	var sum int
-	for i := range weight {
-		if ga.currInds[i].id != excludeID {
-			if i == 0 {
-				weight[0] = 1024
-			} else {
-				weight[i] = weight[i-1]*9/10 + 1
-			}
-			sum += weight[i]
-		}
-	}
-
-	r := rand.Intn(sum)
-
-	for i := range weight {
-		r -= weight[i]
-		if r <= 0 {
-			return ga.currInds[i]
-		}
-	}
-	return ga.currInds[0]
-}
-
-func (ga *GAManager) crossover(i1, i2 *individual) (*individual, bool) {
-	values := make([]int32, len(ga.Config.Params))
-	for i := range values {
-		if rand.Intn(2) == 0 {
-			values[i] = i1.values[i]
-		} else {
-			values[i] = i2.values[i]
-		}
-	}
-	return ga.newIndividual(values, "")
-}
-
-func (ga *GAManager) mutate(ind *individual) {
-	n := rand.Intn(2) + 1
-	for ; n > 0; n-- {
-		i := rand.Intn(len(ind.values))
-		min := ga.Config.Params[i].MinimumValue
-		max := ga.Config.Params[i].MaximumValue
-		t := min + rand.Int31n(max-min+1)
-		ind.values[i] = t
-	}
-}
-
 func (ga *GAManager) PrintGeneration(gn int) {
 	log.Printf("Generation: %d\n", gn)
 	for i := range ga.currInds {
-		ss := make([]string, len(ga.currInds[i].values))
-		for vi, v := range ga.currInds[i].values {
-			ss[vi] = strconv.Itoa(int(v))
-		}
-		log.Printf("%s [%s]\n", ga.currInds[i].id, strings.Join(ss, ","))
+		log.Printf("%s %s\n", ga.currInds[i].id, stringifyValues(ga.currInds[i].values))
 	}
 	log.Println()
 }
 
 func (ga *GAManager) Destroy() {
-	ga.normal.stopWithClean()
 	for i := range ga.currInds {
 		ga.currInds[i].stopWithClean()
 	}
@@ -275,22 +161,43 @@ func (ga *GAManager) newIndividual(values []int32, customID string) (*individual
 	return ind, true
 }
 
-func confidenceInterval95(win, loss float64) float64 {
-	if win == 0 || loss == 0 {
-		return 0
+func (ga *GAManager) CalculateBestValues() []int32 {
+	values := make([]int32, len(ga.Config.Params))
+
+	for vi := range ga.Config.Params {
+		values[vi] = nilValue
+
+		scores := make(map[int32]struct {
+			win  float64
+			loss float64
+		})
+		var total float64
+
+		for ii := range ga.allInds {
+			ind := ga.allInds[ii]
+			value := ind.values[vi]
+			score := scores[value]
+
+			score.win += ind.win
+			score.loss += ind.loss
+			total += ind.win + ind.loss
+
+			scores[value] = score
+		}
+
+		var maxX float64
+		for value, score := range scores {
+			const c = 1.0
+			sum := score.win + score.loss
+			if sum >= 1 {
+				x := score.win/sum + c*math.Sqrt(2*math.Log(total)/sum)
+				if x > maxX {
+					values[vi] = value
+					maxX = x
+				}
+			}
+		}
 	}
 
-	n := win + loss
-	q := win / n
-
-	if n <= 1 {
-		return 0
-	}
-
-	// standard deviation
-	a := n / (n - 1)
-	sd := 173.7 * a / math.Sqrt(n*q*(1-q))
-
-	// 95% confidence interval
-	return sd * 2
+	return values
 }

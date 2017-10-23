@@ -19,22 +19,28 @@ func main() {
 
 	params := []ga.Param{
 		{
+			Name:         "EXT_SINGULAR",
+			Normal:       4,
+			MinimumValue: 0,
+			MaximumValue: 4,
+		},
+		{
 			Name:         "EXT_DEPTH_CHECK",
 			Normal:       3,
 			MinimumValue: 0,
-			MaximumValue: 8,
+			MaximumValue: 4,
 		},
 		{
 			Name:         "EXT_DEPTH_ONE_REPLY",
 			Normal:       2,
 			MinimumValue: 0,
-			MaximumValue: 8,
+			MaximumValue: 4,
 		},
 		{
 			Name:         "EXT_DEPTH_RECAP",
 			Normal:       1,
 			MinimumValue: 0,
-			MaximumValue: 8,
+			MaximumValue: 4,
 		},
 		{
 			Name:         "NULL_DEPTH_RATE",
@@ -153,7 +159,7 @@ func main() {
 	}
 	config := ga.Config{
 		Params:             params,
-		NumberOfIndividual: 32,
+		NumberOfIndividual: 33,
 		Duration:           time.Hour * 4,
 	}
 
