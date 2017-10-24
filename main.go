@@ -160,7 +160,7 @@ func main() {
 	config := ga.Config{
 		Params:             params,
 		NumberOfIndividual: 33,
-		Duration:           time.Hour * 4,
+		Duration:           time.Minute * 10,
 	}
 
 	m := ga.NewGAManager(config)
