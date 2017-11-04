@@ -13,17 +13,24 @@ type GAManager struct {
 	Config Config
 
 	server   server.ShogiServer
-	indMap   map[string]*individual
-	allInds  []*individual
 	currInds []*individual
+	scores   []map[int32]scoreType
+}
+
+type scoreType struct {
+	win  float64
+	loss float64
 }
 
 func NewGAManager(config Config) *GAManager {
 	validateConfig(config)
+	scores := make([]map[int32]scoreType, len(config.Params))
+	for i := range scores {
+		scores[i] = make(map[int32]scoreType)
+	}
 	return &GAManager{
-		Config:  config,
-		indMap:  make(map[string]*individual),
-		allInds: make([]*individual, 0, 1024),
+		Config: config,
+		scores: scores,
 	}
 }
 
@@ -55,10 +62,8 @@ func (ga *GAManager) Start() error {
 
 	ga.currInds = make([]*individual, 0, ga.Config.NumberOfIndividual)
 	for len(ga.currInds) < ga.Config.NumberOfIndividual {
-		ind, ok := ga.newIndividual(generateRandomValues(ga.Config), "")
-		if ok {
-			ga.currInds = append(ga.currInds, ind)
-		}
+		ind := newIndividual(ga.Config, generateRandomValues(ga.Config))
+		ga.currInds = append(ga.currInds, ind)
 	}
 
 	err = startIndividuals(ga.currInds)
@@ -71,12 +76,13 @@ func (ga *GAManager) Next() error {
 		return err
 	}
 
-	for _, ind := range ga.indMap {
-		ind.score = 0
+	indMap := make(map[string]*individual)
+	for _, ind := range ga.currInds {
+		indMap[ind.id] = ind
 	}
 	for pi := range rate.Players {
 		for _, player := range rate.Players[pi] {
-			if ind, ok := ga.indMap[player.Name]; ok {
+			if ind, ok := indMap[player.Name]; ok {
 				ind.score = player.Rate
 				ind.win = player.Win
 				ind.loss = player.Loss
@@ -91,6 +97,9 @@ func (ga *GAManager) Next() error {
 	}
 	log.Println()
 
+	// Update Scores
+	ga.UpdateScores()
+
 	// Best Values
 	bestValues := ga.CalculateBestValues()
 	log.Println("Best Values")
@@ -101,7 +110,7 @@ func (ga *GAManager) Next() error {
 	inds := make([]*individual, 0, ga.Config.NumberOfIndividual)
 
 	// Indivisuals
-	for i := 0; i < ga.Config.NumberOfIndividual; {
+	for i := 0; i < ga.Config.NumberOfIndividual; i++ {
 		values := make([]int32, len(ga.Config.Params))
 		randomValues := generateRandomValues(ga.Config)
 		randomIdx := rand.Intn(len(ga.Config.Params))
@@ -112,12 +121,9 @@ func (ga *GAManager) Next() error {
 				values[i] = bestValues[i]
 			}
 		}
-		ind, ok := ga.newIndividual(values, "")
-		if ok {
-			log.Printf("random: => %s", ind.id)
-			inds = append(inds, ind)
-			i++
-		}
+		ind := newIndividual(ga.Config, values)
+		log.Printf("random: => %s", ind.id)
+		inds = append(inds, ind)
 	}
 
 	// Stop Previous Generation
@@ -147,52 +153,40 @@ func (ga *GAManager) Destroy() {
 	ga.server.Stop()
 }
 
-func (ga *GAManager) newIndividual(values []int32, customID string) (*individual, bool) {
-	ind := newIndividual(ga.Config, values, customID)
+func (ga *GAManager) UpdateScores() {
+	for i := range ga.Config.Params {
+		for _, ind := range ga.currInds {
+			value := ind.values[i]
+			score := ga.scores[i][value]
 
-	if _, exists := ga.indMap[ind.id]; exists {
-		return nil, false
-	}
+			score.win += ind.win
+			score.loss += ind.loss
 
-	ga.indMap[ind.id] = ind
-	if customID == "" {
-		ga.allInds = append(ga.allInds, ind)
+			ga.scores[i][value] = score
+		}
 	}
-	return ind, true
 }
 
 func (ga *GAManager) CalculateBestValues() []int32 {
 	values := make([]int32, len(ga.Config.Params))
 
-	for vi := range ga.Config.Params {
-		values[vi] = nilValue
+	for i := range ga.Config.Params {
+		values[i] = nilValue
 
-		scores := make(map[int32]struct {
-			win  float64
-			loss float64
-		})
 		var total float64
-
-		for ii := range ga.allInds {
-			ind := ga.allInds[ii]
-			value := ind.values[vi]
-			score := scores[value]
-
-			score.win += ind.win
-			score.loss += ind.loss
-			total += ind.win + ind.loss
-
-			scores[value] = score
+		for value := range ga.scores[i] {
+			total += ga.scores[i][value].win
+			total += ga.scores[i][value].loss
 		}
 
 		var maxX float64
-		for value, score := range scores {
+		for value, score := range ga.scores[i] {
 			const c = 1.0
 			sum := score.win + score.loss
 			if sum >= 1 {
 				x := score.win/sum + c*math.Sqrt(2*math.Log(total)/sum)
 				if x > maxX {
-					values[vi] = value
+					values[i] = value
 					maxX = x
 				}
 			}

@@ -30,16 +30,12 @@ type individual struct {
 	config Config
 }
 
-func newIndividual(config Config, values []int32, customID string) *individual {
+func newIndividual(config Config, values []int32) *individual {
 	ind := &individual{
 		values: values,
 		config: config,
 	}
-	if customID != "" {
-		ind.id = customID
-	} else {
-		ind.setUniqueID()
-	}
+	ind.setUniqueID()
 	return ind
 }
 
