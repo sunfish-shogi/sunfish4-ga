@@ -122,7 +122,6 @@ func (ga *GAManager) Next() error {
 			}
 		}
 		ind := newIndividual(ga.Config, values)
-		log.Printf("random: => %s", ind.id)
 		inds = append(inds, ind)
 	}
 
