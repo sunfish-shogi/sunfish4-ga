@@ -67,6 +67,7 @@ func (ga *GAManager) Start() error {
 		if _, exists := usedIDs[ind.id]; exists {
 			continue
 		}
+		usedIDs[ind.id] = struct{}{}
 		ga.inds = append(ga.inds, ind)
 	}
 
@@ -130,6 +131,7 @@ func (ga *GAManager) Next() error {
 		if _, exists := usedIDs[ind.id]; exists {
 			continue
 		}
+		usedIDs[ind.id] = struct{}{}
 		inds = append(inds, ind)
 	}
 
