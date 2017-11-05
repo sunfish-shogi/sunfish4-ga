@@ -12,9 +12,9 @@ import (
 type GAManager struct {
 	Config Config
 
-	server   server.ShogiServer
-	currInds []*individual
-	scores   []map[int32]scoreType
+	server server.ShogiServer
+	inds   []*individual
+	scores []map[int32]scoreType
 }
 
 type scoreType struct {
@@ -60,13 +60,17 @@ func (ga *GAManager) Start() error {
 		return err
 	}
 
-	ga.currInds = make([]*individual, 0, ga.Config.NumberOfIndividual)
-	for len(ga.currInds) < ga.Config.NumberOfIndividual {
+	usedIDs := make(map[string]struct{})
+	ga.inds = make([]*individual, 0, ga.Config.NumberOfIndividual)
+	for len(ga.inds) < ga.Config.NumberOfIndividual {
 		ind := newIndividual(ga.Config, generateRandomValues(ga.Config))
-		ga.currInds = append(ga.currInds, ind)
+		if _, exists := usedIDs[ind.id]; exists {
+			continue
+		}
+		ga.inds = append(ga.inds, ind)
 	}
 
-	err = startIndividuals(ga.currInds)
+	err = startIndividuals(ga.inds)
 	return err
 }
 
@@ -77,7 +81,7 @@ func (ga *GAManager) Next() error {
 	}
 
 	indMap := make(map[string]*individual)
-	for _, ind := range ga.currInds {
+	for _, ind := range ga.inds {
 		indMap[ind.id] = ind
 	}
 	for pi := range rate.Players {
@@ -92,8 +96,8 @@ func (ga *GAManager) Next() error {
 
 	// Print Scores
 	log.Println("Score")
-	for i := range ga.currInds {
-		log.Printf("%s %0.3f", ga.currInds[i].id, ga.currInds[i].score)
+	for i := range ga.inds {
+		log.Printf("%s %0.3f", ga.inds[i].id, ga.inds[i].score)
 	}
 	log.Println()
 
@@ -110,6 +114,7 @@ func (ga *GAManager) Next() error {
 	inds := make([]*individual, 0, ga.Config.NumberOfIndividual)
 
 	// Indivisuals
+	usedIDs := make(map[string]struct{})
 	for i := 0; i < ga.Config.NumberOfIndividual; i++ {
 		values := make([]int32, len(ga.Config.Params))
 		randomValues := generateRandomValues(ga.Config)
@@ -122,39 +127,42 @@ func (ga *GAManager) Next() error {
 			}
 		}
 		ind := newIndividual(ga.Config, values)
+		if _, exists := usedIDs[ind.id]; exists {
+			continue
+		}
 		inds = append(inds, ind)
 	}
 
 	// Stop Previous Generation
-	stopIndividuals(ga.currInds)
+	stopIndividuals(ga.inds)
 
 	// Replace to New Generation
-	ga.currInds = inds
+	ga.inds = inds
 
 	// Start Next Generation
-	startIndividuals(ga.currInds)
+	startIndividuals(ga.inds)
 
 	return nil
 }
 
 func (ga *GAManager) PrintGeneration(gn int) {
 	log.Printf("Generation: %d\n", gn)
-	for i := range ga.currInds {
-		log.Printf("%s %s\n", ga.currInds[i].id, stringifyValues(ga.currInds[i].values))
+	for i := range ga.inds {
+		log.Printf("%s %s\n", ga.inds[i].id, stringifyValues(ga.inds[i].values))
 	}
 	log.Println()
 }
 
 func (ga *GAManager) Destroy() {
-	for i := range ga.currInds {
-		ga.currInds[i].stopWithClean()
+	for i := range ga.inds {
+		ga.inds[i].stopWithClean()
 	}
 	ga.server.Stop()
 }
 
 func (ga *GAManager) UpdateScores() {
 	for i := range ga.Config.Params {
-		for _, ind := range ga.currInds {
+		for _, ind := range ga.inds {
 			value := ind.values[i]
 			score := ga.scores[i][value]
 
