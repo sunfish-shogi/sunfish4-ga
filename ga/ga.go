@@ -116,7 +116,7 @@ func (ga *GAManager) Next() error {
 
 	// Indivisuals
 	usedIDs := make(map[string]struct{})
-	for i := 0; i < ga.Config.NumberOfIndividual; i++ {
+	for len(inds) < ga.Config.NumberOfIndividual {
 		values := make([]int32, len(ga.Config.Params))
 		randomValues := generateRandomValues(ga.Config)
 		randomIdx := rand.Intn(len(ga.Config.Params))
