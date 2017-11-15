@@ -1,9 +1,9 @@
 package ga
 
 import (
+	"fmt"
 	"log"
 	"math"
-	"math/rand"
 	"time"
 
 	server "github.com/sunfish-shogi/sunfish4-ga/shogiserver"
@@ -12,9 +12,10 @@ import (
 type GAManager struct {
 	Config Config
 
-	server server.ShogiServer
-	inds   []*individual
-	scores []map[int32]scoreType
+	server   server.ShogiServer
+	inds     []*individual
+	normInds []*individual
+	scores   []map[int32]scoreType
 }
 
 type scoreType struct {
@@ -60,38 +61,28 @@ func (ga *GAManager) Start() error {
 		return err
 	}
 
-	usedIDs := make(map[string]struct{})
-	ga.inds = make([]*individual, 0, ga.Config.NumberOfIndividual)
-	for len(ga.inds) < ga.Config.NumberOfIndividual {
-		ind := newIndividual(ga.Config, generateRandomValues(ga.Config))
-		if _, exists := usedIDs[ind.id]; exists {
-			continue
-		}
-		usedIDs[ind.id] = struct{}{}
+	values := generateNormalValues(ga.Config)
+	ga.normInds = make([]*individual, 0, ga.Config.Concurrency)
+	for i := 0; i < ga.Config.Concurrency; i++ {
+		ind := newIndividual(fmt.Sprintf("n-%d", i), i, ga.Config, values)
+		ga.normInds = append(ga.normInds, ind)
+	}
+
+	values = generateRandomValues(ga.Config)
+	ga.inds = make([]*individual, 0, ga.Config.Concurrency)
+	for i := 0; i < ga.Config.Concurrency; i++ {
+		ind := newIndividual(fmt.Sprintf("i-%d", i), i, ga.Config, values)
 		ga.inds = append(ga.inds, ind)
 	}
 
-	err = startIndividuals(ga.inds)
+	err = startIndividuals(append(ga.inds, ga.normInds...))
 	return err
 }
 
 func (ga *GAManager) Next() error {
-	rate, err := ga.server.MakeRate()
-	if err != nil {
-		return err
-	}
-
-	indMap := make(map[string]*individual)
 	for _, ind := range ga.inds {
-		indMap[ind.id] = ind
-	}
-	for pi := range rate.Players {
-		for _, player := range rate.Players[pi] {
-			if ind, ok := indMap[player.Name]; ok {
-				ind.score = player.Rate
-				ind.win = player.Win
-				ind.loss = player.Loss
-			}
+		if err := ind.UpdateScore(); err != nil {
+			log.Println(err)
 		}
 	}
 
@@ -105,26 +96,9 @@ func (ga *GAManager) Next() error {
 	log.Println()
 
 	// New Generation
-	inds := make([]*individual, 0, ga.Config.NumberOfIndividual)
-
-	// Indivisuals
-	usedIDs := make(map[string]struct{})
-	for len(inds) < ga.Config.NumberOfIndividual {
-		values := make([]int32, len(ga.Config.Params))
-		randomValues := generateRandomValues(ga.Config)
-		randomIdx := rand.Intn(len(ga.Config.Params))
-		for i := range ga.Config.Params {
-			if bestValues[i] == nilValue || i == randomIdx {
-				values[i] = randomValues[i]
-			} else {
-				values[i] = bestValues[i]
-			}
-		}
-		ind := newIndividual(ga.Config, values)
-		if _, exists := usedIDs[ind.id]; exists {
-			continue
-		}
-		usedIDs[ind.id] = struct{}{}
+	inds := make([]*individual, 0, ga.Config.Concurrency)
+	for i := 0; i < ga.Config.Concurrency; i++ {
+		ind := newIndividual(fmt.Sprintf("i-%d", i), i, ga.Config, bestValues)
 		inds = append(inds, ind)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/big"
 	"os"
 	"os/exec"
 	"path"
@@ -14,41 +13,29 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sunfish-shogi/sunfish4-ga/util"
-	"github.com/tv42/base58"
 	"golang.org/x/sync/errgroup"
 )
 
 const nilValue int32 = math.MaxInt32
 
 type individual struct {
-	id     string
-	values []int32
-	score  float64
-	win    float64
-	loss   float64
-	cmd    *exec.Cmd
-	config Config
+	id         string
+	gameNumber int
+	values     []int32
+	win        float64
+	loss       float64
+	cmd        *exec.Cmd
+	config     Config
 }
 
-func newIndividual(config Config, values []int32) *individual {
+func newIndividual(id string, gameNumber int, config Config, values []int32) *individual {
 	ind := &individual{
-		values: values,
-		config: config,
+		id:         id,
+		gameNumber: gameNumber,
+		values:     values,
+		config:     config,
 	}
-	ind.setUniqueID()
 	return ind
-}
-
-func (ind *individual) setUniqueID() {
-	x := big.NewInt(0)
-	for i := range ind.config.Params {
-		value := ind.values[i]
-		param := ind.config.Params[i]
-
-		x.Mul(x, big.NewInt(int64(param.MaximumValue-param.MinimumValue)))
-		x.Add(x, big.NewInt(int64(value-param.MinimumValue)))
-	}
-	ind.id = string(base58.EncodeBig(nil, x))
 }
 
 func (ind *individual) setup() error {
@@ -123,7 +110,7 @@ func (ind *individual) writeCsaIni() error {
 	f.WriteString("[Server]\n")
 	f.WriteString("Host      = localhost\n")
 	f.WriteString("Port      = 4081\n")
-	f.WriteString("Pass      = test-600-10,SunTest\n")
+	f.WriteString("Pass      = test" + strconv.Itoa(ind.gameNumber) + "-600-10,SunTest\n")
 	f.WriteString("Floodgate = 1\n")
 	f.WriteString("User      = " + ind.id + "\n")
 	f.WriteString("\n")
@@ -145,6 +132,17 @@ func (ind *individual) writeCsaIni() error {
 	f.WriteString("\n")
 	f.WriteString("[File]\n")
 	f.WriteString("KifuDir   = out/csa_kifu\n")
+
+	return f.Close()
+}
+
+func (ind *individual) UpdateScore() error {
+	f, err := os.OpenFile(path.Join(ind.Dir(), "out/csa.log"), os.O_RDONLY, 0666)
+	if err != nil {
+		return err
+	}
+
+	// FIXME
 
 	return f.Close()
 }

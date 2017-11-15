@@ -8,25 +8,30 @@ import (
 
 type Param struct {
 	Name         string
+	Normal       int32
 	MinimumValue int32
 	MaximumValue int32
 	Step         int32
 }
 
 type Config struct {
-	Params             []Param
-	NumberOfIndividual int
-	Duration           time.Duration
+	Params      []Param
+	Concurrency int
+	Duration    time.Duration
 }
 
 func validateConfig(config Config) {
-	if config.NumberOfIndividual == 0 {
+	if config.Concurrency == 0 {
 		log.Fatal("NumberOfIndividual must not be zero")
 	}
+}
 
-	if config.NumberOfIndividual%2 == 0 {
-		log.Fatal("NumberOfIndividual must not be even number")
+func generateNormalValues(config Config) []int32 {
+	values := make([]int32, len(config.Params))
+	for i := range config.Params {
+		values[i] = config.Params[i].Normal
 	}
+	return values
 }
 
 func generateRandomValues(config Config) []int32 {
