@@ -95,13 +95,6 @@ func (ga *GAManager) Next() error {
 		}
 	}
 
-	// Print Scores
-	log.Println("Score")
-	for i := range ga.inds {
-		log.Printf("%s %0.3f", ga.inds[i].id, ga.inds[i].score)
-	}
-	log.Println()
-
 	// Update Scores
 	ga.UpdateScores()
 
