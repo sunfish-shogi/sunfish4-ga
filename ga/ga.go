@@ -30,6 +30,10 @@ func NewGAManager(config Config) *GAManager {
 	scores := make([]map[int32]scoreType, len(config.Params))
 	for i := range scores {
 		scores[i] = make(map[int32]scoreType)
+		param := config.Params[i]
+		for val := param.MinimumValue; val <= param.MaximumValue; val += param.Step {
+			scores[i][val] = scoreType{}
+		}
 	}
 	return &GAManager{
 		Config: config,
