@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"time"
 
 	server "github.com/sunfish-shogi/sunfish4-ga/shogiserver"
@@ -162,12 +163,15 @@ func (ga *GAManager) CalculateBestValues() []int32 {
 		for value, score := range ga.scores[i] {
 			const c = 1.0
 			sum := score.win + score.loss
+			var x float64
 			if sum >= 1 {
-				x := score.win/sum + c*math.Sqrt(2*math.Log(total)/sum)
-				if x > maxX {
-					values[i] = value
-					maxX = x
-				}
+				x = score.win/sum + c*math.Sqrt(2*math.Log(total)/sum)
+			} else {
+				x = rand.Float64() // [0.0,1.0)
+			}
+			if x > maxX {
+				values[i] = value
+				maxX = x
 			}
 		}
 	}
