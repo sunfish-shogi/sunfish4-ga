@@ -80,11 +80,14 @@ func (ga *GAManager) Start() error {
 }
 
 func (ga *GAManager) Next() error {
+	log.Println("Scores")
 	for _, ind := range ga.inds {
 		if err := ind.UpdateScore(); err != nil {
 			log.Println(err)
 		}
+		log.Printf("%s %d - %d\n", ind.id, ind.win, ind.loss)
 	}
+	log.Println()
 
 	// Update Scores
 	ga.UpdateScores()
@@ -135,8 +138,8 @@ func (ga *GAManager) UpdateScores() {
 			value := ind.values[i]
 			score := ga.scores[i][value]
 
-			score.win += ind.win
-			score.loss += ind.loss
+			score.win += float64(ind.win)
+			score.loss += float64(ind.loss)
 
 			ga.scores[i][value] = score
 		}

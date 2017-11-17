@@ -1,12 +1,14 @@
 package ga
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"math"
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,8 +24,8 @@ type individual struct {
 	id         string
 	gameNumber int
 	values     []int32
-	win        float64
-	loss       float64
+	win        int
+	loss       int
 	cmd        *exec.Cmd
 	config     Config
 }
@@ -136,15 +138,35 @@ func (ind *individual) writeCsaIni() error {
 	return f.Close()
 }
 
+var regexpLogRecvWin = regexp.MustCompile(`^[^ ]* \[RECV\] +#WIN$`)
+var regexpLogRecvLose = regexp.MustCompile(`^[^ ]* \[RECV\] +#LOSE$`)
+
 func (ind *individual) UpdateScore() error {
-	f, err := os.OpenFile(path.Join(ind.Dir(), "out/csa.log"), os.O_RDONLY, 0666)
+	f, err := os.Open(path.Join(ind.Dir(), "out/csa.log"))
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
-	// FIXME
+	var win int
+	var loss int
 
-	return f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
+		if regexpLogRecvWin.MatchString(line) {
+			win++
+		} else if regexpLogRecvLose.MatchString(line) {
+			loss++
+		}
+	}
+	if err := s.Err(); err != nil {
+		return err
+	}
+
+	ind.win = win
+	ind.loss = loss
+	return nil
 }
 
 func (ind *individual) stopWithClean() {
