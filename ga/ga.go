@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"strconv"
 	"time"
 
 	server "github.com/sunfish-shogi/sunfish4-ga/shogiserver"
@@ -94,8 +95,8 @@ func (ga *GAManager) Next() error {
 	ga.UpdateScores()
 
 	// Best Values
-	bestValues := ga.CalculateBestValues()
 	log.Println("Best Values")
+	bestValues := ga.CalculateBestValues()
 	log.Println(stringifyValues(bestValues))
 	log.Println()
 
@@ -149,6 +150,7 @@ func (ga *GAManager) UpdateScores() {
 
 func (ga *GAManager) CalculateBestValues() []int32 {
 	values := make([]int32, len(ga.Config.Params))
+	var maxValues string
 
 	for i := range ga.Config.Params {
 		values[i] = nilValue
@@ -174,7 +176,9 @@ func (ga *GAManager) CalculateBestValues() []int32 {
 				maxX = x
 			}
 		}
+		maxValues = maxValues + " " + strconv.FormatFloat(maxX, 'f', 2, 64)
 	}
+	log.Println("ucb1: ", maxValues)
 
 	return values
 }

@@ -3,11 +3,16 @@ package main
 import (
 	"io"
 	"log"
+	"math/rand"
 	"os"
 	"time"
 
 	"github.com/sunfish-shogi/sunfish4-ga/ga"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func main() {
 	f, err := os.OpenFile("ga.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
