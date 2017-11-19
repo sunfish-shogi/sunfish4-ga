@@ -3,7 +3,6 @@ package ga
 import (
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"strconv"
 	"time"
@@ -157,21 +156,12 @@ func (ga *GAManager) CalculateBestValues() []int32 {
 	var maxValues string
 
 	for i := range ga.Config.Params {
-		values[i] = nilValue
-
-		var total float64
-		for value := range ga.scores[i] {
-			total += ga.scores[i][value].win
-			total += ga.scores[i][value].loss
-		}
-
-		var maxX float64
+		maxX := float64(-1.0)
 		for value, score := range ga.scores[i] {
-			const c = 1.0
 			sum := score.win + score.loss
 			var x float64
 			if sum >= 1 {
-				x = score.win/sum + c*math.Sqrt(2*math.Log(total)/sum)
+				x = score.win / sum
 			} else {
 				x = rand.Float64() // [0.0,1.0)
 			}
@@ -181,6 +171,18 @@ func (ga *GAManager) CalculateBestValues() []int32 {
 			}
 		}
 		maxValues = maxValues + " " + strconv.FormatFloat(maxX, 'f', 2, 64)
+
+		const epsilon = 0.1
+		if rand.Float64() < epsilon {
+			vs := make([]int32, len(ga.scores[i]))
+			var i int
+			for value := range ga.scores[i] {
+				vs[i] = value
+				i++
+			}
+			values[i] = vs[rand.Int31n(int32(len(vs)))]
+			maxValues = maxValues + "(e)"
+		}
 	}
 	log.Println("ucb1: ", maxValues)
 

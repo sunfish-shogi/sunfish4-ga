@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/exec"
 	"path"
@@ -17,8 +16,6 @@ import (
 	"github.com/sunfish-shogi/sunfish4-ga/util"
 	"golang.org/x/sync/errgroup"
 )
-
-const nilValue int32 = math.MaxInt32
 
 type individual struct {
 	id         string
@@ -248,11 +245,7 @@ func stopIndividuals(inds []*individual) {
 func stringifyValues(values []int32) string {
 	ss := make([]string, len(values))
 	for vi, v := range values {
-		if v == nilValue {
-			ss[vi] = "*"
-		} else {
-			ss[vi] = strconv.Itoa(int(v))
-		}
+		ss[vi] = strconv.Itoa(int(v))
 	}
 	return "[" + strings.Join(ss, ",") + "]"
 }
