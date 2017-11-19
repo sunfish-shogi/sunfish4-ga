@@ -112,13 +112,13 @@ func (ga *GAManager) Next() error {
 	}
 
 	// Stop Previous Generation
-	stopIndividuals(ga.inds)
+	stopIndividuals(append(ga.inds, ga.normInds...))
 
 	// Replace to New Generation
 	ga.inds = inds
 
 	// Start Next Generation
-	startIndividuals(ga.inds)
+	startIndividuals(append(ga.inds, ga.normInds...))
 
 	return nil
 }

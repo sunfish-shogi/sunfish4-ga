@@ -175,11 +175,13 @@ func (ind *individual) stopWithClean() {
 }
 
 func (ind *individual) kill() {
-	if ind.cmd != nil && ind.cmd.Process != nil {
-		if err := ind.cmd.Process.Kill(); err != nil {
-			log.Println(err)
-		} else if _, err := ind.cmd.Process.Wait(); err != nil {
-			log.Println(err)
+	if ind.cmd != nil {
+		if ind.cmd.Process != nil {
+			if err := ind.cmd.Process.Kill(); err != nil {
+				log.Println(err)
+			} else if _, err := ind.cmd.Process.Wait(); err != nil {
+				log.Println(err)
+			}
 		}
 		ind.cmd = nil
 	}
@@ -230,7 +232,7 @@ func stopIndividuals(inds []*individual) {
 	wg := &sync.WaitGroup{}
 	for _, ind := range inds {
 		wg.Add(1)
-		func(ind *individual) {
+		go func(ind *individual) {
 			defer wg.Done()
 			ind.kill()
 		}(ind)
